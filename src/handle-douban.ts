@@ -55,7 +55,7 @@ function buildMovieItem(doc: Document) {
     ? [...writersPl[0].nextElementSibling?.querySelectorAll('span a')!]
       .slice(0, 5).map(i => i.textContent).join(' / ')
     : '';
-  console.log('writers: ', writers);
+
   const genre = [...doc.querySelectorAll('#info [property="v:genre"]')].map(i => i.textContent || '').filter(v => v);
   const imdbInfo = [...doc.querySelectorAll(InfoSelector)].filter(i => i.textContent?.startsWith('IMDb'));
   const imdbLink = imdbInfo.length ? 'https://www.imdb.com/title/' + imdbInfo[0].nextSibling?.textContent?.trim() : '';
@@ -79,7 +79,18 @@ function buildMusicItem(doc: Document) {
   const cover = img?.title !== ImgDefaultTitle.Cover && img?.src.length <= 100 ? img?.src.replace(/\.webp$/, '.jpg') : '';
   const info = [...doc.querySelectorAll(InfoSelector)];
   const release = info.filter(i => i.textContent?.trim().startsWith('发行时间'));
-  const releaseDate = release.length ? dayjs(release[0].nextSibling?.textContent?.trim()).format('YYYY-MM-DD') : '';
+  let releaseDate = '';
+  if (release.length) {
+    const text = release[0].nextSibling?.textContent?.trim() || '';
+    if (/\d{4}-\d/.test(text) && text) {
+      releaseDate = dayjs(text).format('YYYY-MM-DD');
+    } else if (/\d{4}年\d{1,2}月\d{2}日/.test(text)) {
+      // BUG: example: https://music.douban.com/subject/2375247/
+      // 发行时间是中文格式，非`YYYY-MM-DD`
+      const match = text.match(/(\d{4})年(\d{1,2})月(\d{2})日/);
+      releaseDate = dayjs(`${match![1]}-${match![2]}-${match![3]}`).format('YYYY-MM-DD');
+    }
+  }
   const musicianElems = info.filter((i) => i.textContent?.trim().startsWith('表演者'));
   // split and trim to remove extra spaces, rich_text length limited to 2000
   const musician = musicianElems.length
@@ -151,7 +162,8 @@ function buildGameItem(doc: Document) {
   const title = doc.querySelector('#wrapper #content h1')?.textContent?.trim() || '';
   const img = doc.querySelector('.item-subject-info .pic img') as HTMLImageElement;
   const cover = img?.title !== ImgDefaultTitle.Cover && img?.src.length <= 100 ? img?.src.replace(/\.webp$/, '.jpg') : '';
-  const gameInfo = doc.querySelector('#content .game-attr') as Element;
+  // attributes class name seems to have changed to `thing-attr` instead of `game-attr`
+  const gameInfo = doc.querySelector('#content .game-attr') || doc.querySelector('#content .thing-attr') as Element;
   const dts = [...gameInfo.querySelectorAll('dt')];
   const genre: string[] = [];
   let releaseDate = '';
